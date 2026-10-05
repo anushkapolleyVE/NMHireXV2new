@@ -56,10 +56,10 @@ export default function Login() {
       } else {
         // Recruiter Login Logic
         const formData = new URLSearchParams();
-        formData.append('name', name);
-        formData.append('email', email);
+        formData.append('username', email);
+        formData.append('password', password);
 
-        const response = await fetch(`${API_BASE_URL}/auth/login/recruiter`, {
+        const response = await fetch(`${API_BASE_URL}/auth/login`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -209,21 +209,6 @@ export default function Login() {
 
                 {loginType === 'recruiter' ? (
                   <>
-                    {/* NAME */}
-                    <div>
-                      <label htmlFor="name" className="mb-2 block text-xs font-bold text-slate-300">
-                        Full Name
-                      </label>
-                      <input
-                        id="name"
-                        type="text"
-                        placeholder="John Doe"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                        className="input-dark w-full rounded-xl px-4 py-3.5 text-sm placeholder:text-slate-600"
-                      />
-                    </div>
                     {/* EMAIL */}
                     <div>
                       <label htmlFor="email" className="mb-2 block text-xs font-bold text-slate-300">
@@ -235,6 +220,21 @@ export default function Login() {
                         placeholder="recruiter@company.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="input-dark w-full rounded-xl px-4 py-3.5 text-sm placeholder:text-slate-600"
+                      />
+                    </div>
+                    {/* PASSWORD */}
+                    <div>
+                      <label htmlFor="password" className="mb-2 block text-xs font-bold text-slate-300">
+                        Password
+                      </label>
+                      <input
+                        id="password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                         required
                         className="input-dark w-full rounded-xl px-4 py-3.5 text-sm placeholder:text-slate-600"
                       />

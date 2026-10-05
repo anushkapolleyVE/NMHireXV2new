@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getUserJobs } from '../utils/api';
+import { getRequisitions } from '../utils/api';
+import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 
 const EyeIcon = ({ className }) => (
@@ -20,6 +21,7 @@ const EyeOffIcon = ({ className }) => (
 export default function JobDescriptions() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
   const [expandedJobId, setExpandedJobId] = useState(null);
 
   const toggleDescription = (id) => {
@@ -29,8 +31,23 @@ export default function JobDescriptions() {
   useEffect(() => {
     const fetchJobs = async () => {
       try {
-        const data = await getUserJobs();
-        setJobs(data);
+        const res = await getRequisitions();
+        const apiData = res.data || res;
+        
+        let jobsList = [];
+        if (Array.isArray(apiData)) {
+          jobsList = apiData;
+        } else if (apiData && Array.isArray(apiData.requisitions)) {
+          jobsList = apiData.requisitions;
+        } else if (apiData && Array.isArray(apiData.items)) {
+          jobsList = apiData.items;
+        } else if (apiData && Array.isArray(apiData.data)) {
+          jobsList = apiData.data;
+        } else if (apiData && Array.isArray(apiData.results)) {
+          jobsList = apiData.results;
+        }
+        
+        setJobs(jobsList);
       } catch (err) {
         console.error('Failed to fetch jobs', err);
       } finally {
@@ -72,7 +89,7 @@ export default function JobDescriptions() {
                     <th className="py-4">Work Mode</th>
                     <th className="py-4">Status</th>
                     <th className="py-4 text-right">Created At</th>
-                    <th className="py-4 pr-6 text-center">Action</th>
+                    <th className="py-4 pr-6 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="text-sm">
@@ -98,25 +115,33 @@ export default function JobDescriptions() {
                           <td className="py-5">
                             <span className="inline-flex rounded-full bg-accent/20 px-3 py-1 text-[11px] font-bold text-accent ring-1 ring-accent/30 shadow-[0_0_8px_rgba(20,184,166,0.15)] items-center gap-1.5 w-max flex">
                               <span className="size-1.5 rounded-full bg-accent animate-pulse"></span>
-                              {job.status}
+                              {job.status || 'Open'}
                             </span>
                           </td>
                           <td className="py-5 text-right">
                             <p className="text-slate-400 text-sm">
-                              {new Date(job.created_at).toLocaleDateString('en-IN')}
+                              {job.created_at ? new Date(job.created_at).toLocaleDateString('en-IN') : 'N/A'}
                             </p>
                           </td>
-                          <td className="py-5 pr-6 text-center">
-                            <button 
-                              onClick={() => toggleDescription(job.id || job.job_id)}
-                              className="p-2 rounded-full hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors"
-                              title={expandedJobId === (job.id || job.job_id) ? "Hide Description" : "Show Description"}
-                            >
-                              {expandedJobId === (job.id || job.job_id) ? <EyeOffIcon className="size-5" /> : <EyeIcon className="size-5" />}
-                            </button>
+                          <td className="py-5 pr-6 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button 
+                                onClick={() => navigate(`/requisitions/${job.vereq_number || job.label || job.vereQ || job.requisition_number}/matches`)}
+                                className="rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white shadow-[0_0_15px_rgba(20,184,166,0.4)] hover:bg-teal-400 hover:-translate-y-0.5 transition-all"
+                              >
+                                Top 30 Candidates
+                              </button>
+                              <button 
+                                onClick={() => toggleDescription(job.id || job.vereq_number || job.label || index)}
+                                className="p-2 rounded-full hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors"
+                                title={expandedJobId === (job.id || job.vereq_number || job.label || index) ? "Hide Description" : "Show Description"}
+                              >
+                                {expandedJobId === (job.id || job.vereq_number || job.label || index) ? <EyeOffIcon className="size-5" /> : <EyeIcon className="size-5" />}
+                              </button>
+                            </div>
                           </td>
                         </tr>
-                        {expandedJobId === (job.id || job.job_id) && (
+                        {expandedJobId === (job.id || job.vereq_number || job.label || index) && (
                           <tr className="bg-slate-900/30 border-b border-slate-800/50 animate-slide-up opacity-0-init">
                             <td colSpan="6" className="py-6 px-8">
                               <div className="text-slate-300">
