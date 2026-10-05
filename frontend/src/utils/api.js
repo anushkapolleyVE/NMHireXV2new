@@ -130,6 +130,7 @@ export const screenJob = async (jobId) => {
 // --------------------------------------------------
 
 export const getUserJobs = async () => {
+  
   const response = await fetch(
     `${API_BASE_URL}/user/jobs`,
     {
