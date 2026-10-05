@@ -84,12 +84,12 @@ export default function JobDescriptions() {
               <table className="w-full min-w-[960px] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-700 bg-slate-900/50 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                    <th className="py-4 pl-6">Job Title</th>
-                    <th className="py-4">Location</th>
-                    <th className="py-4">Work Mode</th>
-                    <th className="py-4">Status</th>
-                    <th className="py-4 text-right">Created At</th>
-                    <th className="py-4 pr-6 text-right">Action</th>
+                    <th className="py-4 pl-6 w-1/3">Job Title</th>
+                    <th className="py-4 w-1/6">Location</th>
+                    <th className="py-4 w-1/6">Work Mode</th>
+                    <th className="py-4 w-1/12">Status</th>
+                    <th className="py-4 w-1/12">Created At</th>
+                    <th className="py-4 pr-6 text-right w-1/6">Action</th>
                   </tr>
                 </thead>
                 <tbody className="text-sm">
@@ -106,28 +106,28 @@ export default function JobDescriptions() {
                           <td className="py-5 pl-6">
                             <p className="font-bold text-white text-base">{job.title || 'Untitled Job'}</p>
                           </td>
-                          <td className="py-5">
+                          <td className="py-5 whitespace-nowrap">
                             <p className="font-medium text-slate-300">{job.location || 'N/A'}</p>
                           </td>
-                          <td className="py-5">
+                          <td className="py-5 whitespace-nowrap">
                             <p className="font-medium text-slate-300">{job.work_mode || 'N/A'}</p>
                           </td>
-                          <td className="py-5">
+                          <td className="py-5 whitespace-nowrap">
                             <span className="inline-flex rounded-full bg-accent/20 px-3 py-1 text-[11px] font-bold text-accent ring-1 ring-accent/30 shadow-[0_0_8px_rgba(20,184,166,0.15)] items-center gap-1.5 w-max flex">
                               <span className="size-1.5 rounded-full bg-accent animate-pulse"></span>
                               {job.status || 'Open'}
                             </span>
                           </td>
-                          <td className="py-5 text-right">
+                          <td className="py-5 whitespace-nowrap">
                             <p className="text-slate-400 text-sm">
                               {job.created_at ? new Date(job.created_at).toLocaleDateString('en-IN') : 'N/A'}
                             </p>
                           </td>
-                          <td className="py-5 pr-6 text-right">
+                          <td className="py-5 pr-6 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-2">
                               <button 
                                 onClick={() => navigate(`/requisitions/${job.vereq_number || job.label || job.vereQ || job.requisition_number}/matches`)}
-                                className="rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white shadow-[0_0_15px_rgba(20,184,166,0.4)] hover:bg-teal-400 hover:-translate-y-0.5 transition-all"
+                                className="rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white shadow-[0_0_15px_rgba(20,184,166,0.4)] hover:bg-teal-400 hover:-translate-y-0.5 transition-all whitespace-nowrap"
                               >
                                 Top 30 Candidates
                               </button>

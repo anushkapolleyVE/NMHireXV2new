@@ -17,7 +17,7 @@ export default function ContactCandidateModal({ isOpen, onClose, candidate, onSt
     setLoading(true);
     setError(null);
     try {
-      await updateCandidateStatus(candidate.id, candidate.job_id, 'CONTACTED');
+      await updateCandidateStatus(candidate.job_id, candidate.id, 'CONTACTED');
       onStatusUpdate(candidate.id, 'CONTACTED');
       setIsSent(true);
 
@@ -32,7 +32,7 @@ export default function ContactCandidateModal({ isOpen, onClose, candidate, onSt
     setLoading(true);
     setError(null);
     try {
-      await updateCandidateStatus(candidate.id, candidate.job_id, status);
+      await updateCandidateStatus(candidate.job_id, candidate.id, status);
       onStatusUpdate(candidate.id, status);
       
       if (status === 'INTERESTED') {

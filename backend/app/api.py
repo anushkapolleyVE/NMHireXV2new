@@ -52,6 +52,7 @@ from .tools_function import (
     send_top_outreach,
     sync_resume_matching_candidates,
     update_interview_status,
+    update_candidate_status,
 )
 
 router = APIRouter(prefix="/api")
@@ -67,6 +68,10 @@ class ScheduleInterviewRequest(BaseModel):
 
 class InterviewStatusRequest(BaseModel):
     status: str
+
+class CandidateStatusRequest(BaseModel):
+    status: str
+    target_phone: str | None = None
 
 
 class RequisitionJobRequest(BaseModel):
@@ -574,6 +579,35 @@ def api_user_jobs(
     db: Session = Depends(get_db),
 ):
     return get_user_jobs(db, user.id)
+
+@router.post("/user/jobs/{job_id}/candidates/{candidate_id}/status")
+def api_update_candidate_status(
+    job_id: UUID,
+    candidate_id: UUID,
+    data: CandidateStatusRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job = db.get(Job, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if user.role != "ADMIN" and job.created_by != user.id:
+        raise HTTPException(status_code=403, detail="Not your job")
+
+    try:
+        return {
+            "success": True,
+            "data": update_candidate_status(
+                db=db,
+                job_id=job_id,
+                candidate_id=candidate_id,
+                status=data.status,
+                target_phone=data.target_phone,
+            ),
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/user/jobs/{job_id}/candidates")
