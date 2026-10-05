@@ -1,0 +1,627 @@
+"""NM-HireX API routes.
+
+The new recruitment flow starts after the external Resume Matching API has
+already produced the matched candidates, Sheela ranking and candidate score.
+NM-HireX owns persistence, history checks, WhatsApp, scheduling and status.
+"""
+
+from datetime import datetime
+from pathlib import Path
+from uuid import UUID
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Query,
+    UploadFile,
+)
+from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from .auth import (
+    create_access_token,
+    get_current_user,
+    hash_password,
+    require_admin,
+    verify_password,
+)
+from .config import settings
+from .database import get_db
+from .models import Job, JobCandidate, JobSource, User
+from .tools_function import (
+    create_job,
+    create_job_from_resume_matching_requisition,
+    get_admin_job_candidates,
+    get_admin_jobs,
+    get_job_candidates,
+    get_outreach_candidates,
+    get_resume_matching_requisitions,
+    get_user_dashboard,
+    get_user_job_candidates,
+    get_user_jobs,
+    handle_whatsapp_webhook,
+    ingest_resume_folder,
+    read_file,
+    schedule_candidate_interview,
+    send_top_outreach,
+    sync_resume_matching_candidates,
+    update_interview_status,
+)
+
+router = APIRouter(prefix="/api")
+
+
+# ============================================================
+# REQUEST SCHEMAS
+# ============================================================
+class ScheduleInterviewRequest(BaseModel):
+    scheduled_at: datetime
+    interview_link: str | None = None
+
+
+class InterviewStatusRequest(BaseModel):
+    status: str
+
+
+class RequisitionJobRequest(BaseModel):
+    vereq_number: str = Field(min_length=1)
+
+
+# ============================================================
+# HEALTH
+# ============================================================
+@router.get("/health")
+def health():
+    return {"status": "ok", "service": "NM-HireX"}
+
+
+# ============================================================
+# AUTH
+# ============================================================
+@router.post("/auth/register")
+def register(
+    name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    email = email.strip().lower()
+
+    if len(password) < 8:
+        raise HTTPException(
+            status_code=400,
+            detail="Password must be at least 8 characters",
+        )
+
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered",
+        )
+
+    user = User(
+        name=name.strip(),
+        email=email,
+        password_hash=hash_password(password),
+        role="RECRUITER",
+        status="APPROVED",
+        is_active=True,
+    )
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "message": "User registered successfully",
+        "user": {
+            "id": str(user.id),
+            "name": user.name,
+            "email": user.email,
+            "role": user.role,
+        },
+    }
+
+
+@router.post("/auth/login")
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    email = form_data.username.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+
+    if (
+        not user
+        or not user.is_active
+        or not user.password_hash
+        or not verify_password(form_data.password, user.password_hash)
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if user.status not in {"APPROVED", "ACTIVE", "PENDING"}:
+        raise HTTPException(
+            status_code=403,
+            detail="User account is not active",
+        )
+
+    return {
+        "access_token": create_access_token(user),
+        "token_type": "bearer",
+        "user": {
+            "id": str(user.id),
+            "name": user.name,
+            "email": user.email,
+            "role": user.role,
+        },
+    }
+
+
+@router.get("/auth/me")
+def me(user: User = Depends(get_current_user)):
+    return {
+        "id": str(user.id),
+        "name": user.name,
+        "email": user.email,
+        "role": user.role,
+        "status": user.status,
+        "is_active": user.is_active,
+    }
+
+
+# ============================================================
+# RESUME INGESTION - legacy/admin only
+# ============================================================
+@router.post("/resumes/ingest")
+def api_ingest_resumes(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return ingest_resume_folder(db)
+
+
+# ============================================================
+# LEGACY JD CREATION - kept for backward compatibility
+# The new VEREQ flow below does not need JD upload.
+# ============================================================
+@router.post("/jobs")
+def api_create_job(
+    file: UploadFile | None = File(None),
+    jd_text: str | None = Form(None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if user.role == "ADMIN":
+        raise HTTPException(
+            status_code=403,
+            detail="Admin cannot create job descriptions",
+        )
+
+    if file and jd_text:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either a JD file or JD text, not both",
+        )
+
+    if not file and not jd_text:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either a JD file or JD text",
+        )
+
+    if jd_text:
+        job = create_job(
+            db=db,
+            user_id=user.id,
+            raw_text=jd_text,
+        )
+    else:
+        file_path = Path(settings.JD_DIR) / file.filename
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(file_path, "wb") as output:
+            output.write(file.file.read())
+
+        raw_text = read_file(str(file_path))
+        job = create_job(
+            db=db,
+            user_id=user.id,
+            raw_text=raw_text,
+            file_name=file.filename,
+            file_path=str(file_path),
+        )
+
+    return {
+        "success": True,
+        "job_id": str(job.id),
+        "title": job.title,
+        "status": job.status,
+    }
+
+
+# ============================================================
+# EXTERNAL RESUME MATCHING API - API 1
+# ============================================================
+@router.get("/resume-matching/requisitions")
+def api_resume_matching_requisitions(
+    status: str | None = Query("open"),
+    department: str | None = Query(None),
+    q: str | None = Query(None),
+    # Backward-compatible alias; it is translated to the external API's `q`.
+    search: str | None = Query(None, include_in_schema=False),
+    period: str | None = Query(None),
+    created_from: str | None = Query(None),
+    created_to: str | None = Query(None),
+    sort: str | None = Query("status"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    include: str | None = Query(None),
+    user: User = Depends(get_current_user),
+):
+    try:
+        effective_q = q or search
+        effective_include = include if include in {None, "details"} else None
+
+        return {
+            "success": True,
+            "data": get_resume_matching_requisitions(
+                status=status,
+                department=department,
+                q=effective_q,
+                period=period,
+                created_from=created_from,
+                created_to=created_to,
+                sort=sort,
+                limit=limit,
+                offset=offset,
+                include=effective_include,
+                end_user=user.email,
+            ),
+        }
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=str(exc),
+        )
+
+
+# ============================================================
+# CREATE A LOCAL JOB FROM ONE VEREQ
+# ============================================================
+@router.post("/resume-matching/requisitions/{vereq_number}/create-job")
+def api_create_job_from_vereq(
+    vereq_number: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if user.role == "ADMIN":
+        raise HTTPException(
+            status_code=403,
+            detail="Admin cannot create jobs",
+        )
+
+    try:
+        job = create_job_from_resume_matching_requisition(
+            db=db,
+            user_id=user.id,
+            vereq_number=vereq_number,
+            end_user=user.email,
+        )
+        return {
+            "success": True,
+            "job_id": str(job.id),
+            "vereq_number": vereq_number,
+            "title": job.title,
+        }
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        )
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=502,
+            detail=str(exc),
+        )
+
+
+# ============================================================
+# EXTERNAL RESUME MATCHING API - API 2
+# This is the point where the score/rank enters NM-HireX.
+# ============================================================
+@router.post("/jobs/{job_id}/resume-matching")
+def api_resume_matching(
+    job_id: UUID,
+    vereq_number: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job = db.get(Job, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if user.role != "ADMIN" and job.created_by != user.id:
+        raise HTTPException(status_code=403, detail="Not your job")
+
+    try:
+        result = sync_resume_matching_candidates(
+            db=db,
+            job_id=job_id,
+            vereq_number=vereq_number,
+            top_n=100,
+            poll=True,
+            end_user=user.email,
+        )
+        return {
+            "success": True,
+            "message": "External matches saved successfully",
+            "data": result,
+        }
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=502,
+            detail=str(exc),
+        )
+
+
+# ============================================================
+# BACKWARD-COMPATIBLE SCREEN ENDPOINT
+# IMPORTANT: it no longer runs local AI scoring.
+# ============================================================
+@router.post("/jobs/{job_id}/screen")
+def api_screen_job(
+    job_id: UUID,
+    vereq_number: str | None = Query(None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job = db.get(Job, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if user.role != "ADMIN" and job.created_by != user.id:
+        raise HTTPException(status_code=403, detail="Not your job")
+
+    if not vereq_number:
+        source = db.execute(
+            select(JobSource)
+            .where(
+                JobSource.job_id == job_id,
+                JobSource.source_name == "RESUME_MATCHING",
+            )
+            .order_by(JobSource.searched_at.desc())
+        ).scalars().first()
+
+        if source and source.search_criteria:
+            vereq_number = source.search_criteria.get("vereq_number")
+
+    if not vereq_number:
+        raise HTTPException(
+            status_code=400,
+            detail="VEREQ number is required for external matching",
+        )
+
+    try:
+        return sync_resume_matching_candidates(
+            db=db,
+            job_id=job_id,
+            vereq_number=vereq_number,
+            top_n=100,
+            poll=True,
+            end_user=user.email,
+        )
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+# ============================================================
+# CANDIDATES
+# ============================================================
+@router.get("/jobs/{job_id}/candidates")
+def api_job_candidates(
+    job_id: UUID,
+    limit: int = Query(50, ge=1, le=100),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job = db.get(Job, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if user.role != "ADMIN" and job.created_by != user.id:
+        raise HTTPException(status_code=403, detail="Not your job")
+
+    return {
+        "success": True,
+        "data": get_job_candidates(db, job_id, limit=limit),
+    }
+
+
+# ============================================================
+# TOP 50 -> HISTORY CHECK -> WHATSAPP
+# ============================================================
+@router.post("/jobs/{job_id}/outreach")
+def api_outreach(
+    job_id: UUID,
+    limit: int = Query(50, ge=1, le=50),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job = db.get(Job, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if user.role != "ADMIN" and job.created_by != user.id:
+        raise HTTPException(status_code=403, detail="Not your job")
+
+    return send_top_outreach(
+        db=db,
+        job_id=job_id,
+        limit=limit,
+    )
+
+
+# ============================================================
+# WHATSAPP WEBHOOK
+# ============================================================
+@router.post("/webhooks/whatsapp")
+def api_whatsapp_webhook(
+    payload: dict,
+    x_webhook_secret: str | None = Header(
+        default=None,
+        alias="X-Webhook-Secret",
+    ),
+    db: Session = Depends(get_db),
+):
+    if settings.WEBHOOK_SECRET:
+        if x_webhook_secret != settings.WEBHOOK_SECRET:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid webhook secret",
+            )
+
+    return handle_whatsapp_webhook(
+        db=db,
+        payload=payload,
+    )
+
+
+# ============================================================
+# INTERVIEW SCHEDULING
+# ============================================================
+@router.post("/job-candidates/{job_candidate_id}/schedule")
+def api_schedule_interview(
+    job_candidate_id: UUID,
+    data: ScheduleInterviewRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    jc = db.get(JobCandidate, job_candidate_id)
+    if not jc:
+        raise HTTPException(status_code=404, detail="JobCandidate not found")
+
+    job = db.get(Job, jc.job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if user.role != "ADMIN" and job.created_by != user.id:
+        raise HTTPException(status_code=403, detail="Not your job")
+
+    try:
+        return {
+            "success": True,
+            "data": schedule_candidate_interview(
+                db=db,
+                job_candidate_id=job_candidate_id,
+                scheduled_at=data.scheduled_at,
+                interview_link=data.interview_link,
+            ),
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.patch("/job-candidates/{job_candidate_id}/interview-status")
+def api_interview_status(
+    job_candidate_id: UUID,
+    data: InterviewStatusRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    jc = db.get(JobCandidate, job_candidate_id)
+    if not jc:
+        raise HTTPException(status_code=404, detail="JobCandidate not found")
+
+    job = db.get(Job, jc.job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if user.role != "ADMIN" and job.created_by != user.id:
+        raise HTTPException(status_code=403, detail="Not your job")
+
+    try:
+        return {
+            "success": True,
+            "data": update_interview_status(
+                db=db,
+                job_candidate_id=job_candidate_id,
+                status=data.status,
+            ),
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+# ============================================================
+# USER / ADMIN VIEWS
+# ============================================================
+@router.get("/user/jobs")
+def api_user_jobs(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return get_user_jobs(db, user.id)
+
+
+@router.get("/user/jobs/{job_id}/candidates")
+def api_user_candidates(
+    job_id: UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return get_user_job_candidates(db, user.id, job_id)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Not your job")
+
+
+@router.get("/admin/jobs")
+def api_admin_jobs(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return get_admin_jobs(db)
+
+
+@router.get("/admin/jobs/{job_id}/candidates")
+def api_admin_candidates(
+    job_id: UUID,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        return get_admin_job_candidates(db, job_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+
+@router.get("/user/dashboard")
+def api_user_dashboard(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return get_user_dashboard(db, user.id)
+
+
+@router.get("/outreach/candidates")
+def api_outreach_candidates(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return {
+        "success": True,
+        "data": get_outreach_candidates(db, user.id),
+    }
