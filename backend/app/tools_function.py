@@ -4172,83 +4172,24 @@ def _send_whatsapp_cta_message(
     frontend_url = getattr(
         settings,
         "FRONTEND_URL",
-        "http://localhost:5173",
+        "https://nmhirex.onrender.com",
     ).rstrip("/")
 
     scheduling_link = (
-        f"{frontend_url}/schedule/"
-        f"{job_candidate_id}"
+        f"{frontend_url}/schedule/{job_candidate_id}"
     )
 
-    payload = {
-        "to": clean_phone,
-        "type": "interactive",
-        "interactive": {
-            "type": "cta_url",
-            "header": {
-                "type": "text",
-                "text": "Great news! 🎉",
-            },
-            "body": {
-                "text": (
-                    "Please schedule your interview at a convenient "
-                    "date and time within the next 7 days.\n\n"
-                    "Tap the button below to select your preferred "
-                    "date and time.\n\n"
-                    "We look forward to connecting with you! 😊"
-                ),
-            },
-            "action": {
-                "name": "cta_url",
-                "parameters": {
-                    "display_text": "Schedule Now",
-                    "url": scheduling_link,
-                },
-            },
-        },
-    }
-
-    try:
-
-        success, _, _ = _send_whatsapp_payload(
-            payload
-        )
-
-        if success:
-            print(
-                f"WhatsApp CTA message sent to "
-                f"{clean_phone}."
-            )
-            return True
-
-    except Exception as error:
-
-        print(
-            f"Error sending WhatsApp CTA: "
-            f"{error}"
-        )
-
-    # --------------------------------------------------
-    # FALLBACK: PLAIN TEXT SCHEDULING LINK
-    # --------------------------------------------------
-
-    print(
-        "Falling back to plain text message "
-        "with URL..."
-    )
-
-    fallback_message = (
-        "Great news! 🎉\n\n"
-        "Please schedule your interview at a convenient "
-        "date and time within the next 7 days.\n\n"
-        f"Schedule your interview here:\n"
-        f"{scheduling_link}\n\n"
+    text_message = (
+        "Great news! 🎉 We'd love to move forward with your application.\n\n"
+        "Please schedule your interview at a convenient date and time within the next 7 days.\n\n"
+        f"Tap the link below to select your preferred date and time:\n"
+        f"👉 {scheduling_link}\n\n"
         "We look forward to connecting with you! 😊"
     )
 
     return _send_whatsapp_text_message(
         clean_phone,
-        fallback_message,
+        text_message,
     )
 
 
