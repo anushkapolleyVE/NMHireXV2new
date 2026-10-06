@@ -92,10 +92,11 @@ class Settings(BaseSettings):
     # When True, all outgoing WhatsApp messages will be sent
     # to WHATSAPP_TEST_NUMBER instead of the candidate's number.
     WHATSAPP_TEST_MODE: bool = False
+    WHATSAPP_TEST_NUMBER: str = ""
 
     # Test number.
     # You can override this from Render Environment Variables.
-    WHATSAPP_TEST_NUMBER: str = ""
+   
 
     # ---------------------------------------------------------
     # FRONTEND / SCHEDULING
