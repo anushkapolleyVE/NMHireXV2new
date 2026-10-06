@@ -86,16 +86,16 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              <div className="overflow-x-auto pb-2">
+              <div className="overflow-auto max-h-[500px] custom-scrollbar pb-2 pr-1 relative">
                 <table className="w-full min-w-[760px] text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-700 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                      <th className="pb-4 pl-2">Role</th>
-                      <th className="pb-4">Sources</th>
-                      <th className="pb-4">Screened</th>
-                      <th className="pb-4">Strong</th>
-                      <th className="pb-4">Outreach</th>
-                      <th className="pb-4 pr-2 text-right">Actions</th>
+                  <thead className="sticky top-0 bg-[#0B1121] z-10 before:absolute before:inset-0 before:bg-slate-900/50 before:-z-10 before:backdrop-blur-md">
+                    <tr className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      <th className="pb-4 pt-4 pl-2 border-b border-slate-700">Role</th>
+                      <th className="pb-4 pt-4 border-b border-slate-700">Sources</th>
+                      <th className="pb-4 pt-4 border-b border-slate-700">Screened</th>
+                      <th className="pb-4 pt-4 border-b border-slate-700">Strong</th>
+                      <th className="pb-4 pt-4 border-b border-slate-700">Outreach</th>
+                      <th className="pb-4 pt-4 pr-2 text-right border-b border-slate-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="text-sm">
@@ -137,7 +137,7 @@ export default function Dashboard() {
                         </td>
                         <td className="py-4 pr-2 text-right rounded-r-lg">
                           <button 
-                            onClick={() => navigate('/candidates')}
+                            onClick={() => navigate(`/requisitions/${job.vereq_number || job.job_id}/matches`)}
                             className="rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-white hover:shadow-[0_0_15px_rgba(59,130,246,0.4)] transition-all"
                           >
                             View Screened

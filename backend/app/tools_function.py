@@ -248,6 +248,20 @@ def create_job_from_resume_matching_requisition(
     if not vereq_number:
         raise ValueError("VEREQ number is required")
 
+    # Check if a Job for this vereq_number already exists for this user
+    existing_sources = db.scalars(
+        select(JobSource)
+        .join(Job, Job.id == JobSource.job_id)
+        .where(
+            Job.created_by == user_id,
+            JobSource.source_name == "RESUME_MATCHING"
+        )
+    ).all()
+    
+    for source in existing_sources:
+        if source.search_criteria and source.search_criteria.get("vereq_number") == vereq_number:
+            return db.get(Job, source.job_id)
+
     payload = get_resume_matching_requisitions(
         status="all",
         q=vereq_number,
@@ -3553,16 +3567,25 @@ def get_user_dashboard(db: Session, user_id: UUID) -> dict:
     
     # Bulk fetch requirements to avoid N+1 queries
     reqs = {}
+    sources_data = {}
     if job_ids:
         job_reqs = db.execute(select(JobRequirement).where(JobRequirement.job_id.in_(job_ids))).scalars().all()
         for r in job_reqs:
             reqs[r.job_id] = r
             
+        job_sources = db.execute(
+            select(JobSource).where(JobSource.job_id.in_(job_ids), JobSource.source_name == "RESUME_MATCHING")
+        ).scalars().all()
+        for s in job_sources:
+            if s.search_criteria:
+                vereq = s.search_criteria.get("vereq_number")
+                if vereq:
+                    sources_data[s.job_id] = vereq
+            
     screened_data = {}
     if job_ids:
         rows = db.execute(
-            select(JobCandidate.job_id, ScreeningResult.total_score)
-            .join(ScreeningResult, ScreeningResult.job_candidate_id == JobCandidate.id, isouter=True)
+            select(JobCandidate.job_id, JobCandidate.overall_score)
             .where(JobCandidate.job_id.in_(job_ids), JobCandidate.is_shortlisted == True)
         ).all()
         for j_id, score in rows:
@@ -3606,7 +3629,8 @@ def get_user_dashboard(db: Session, user_id: UUID) -> dict:
             "strong": strong_count,
             "outreach_count": 0,
             "outreach_total": screened_count,
-            "status": j.status
+            "status": j.status,
+            "vereq_number": sources_data.get(j.id)
         })
         
     return {
@@ -3617,7 +3641,7 @@ def get_user_dashboard(db: Session, user_id: UUID) -> dict:
             "strong_matches": strong_matches,
             "whatsapp_outreach": whatsapp_outreach
         },
-        "pipeline": pipeline[:5]
+        "pipeline": pipeline
     }
 
 def _clean_whatsapp_phone(raw_phone: str | None) -> str:
