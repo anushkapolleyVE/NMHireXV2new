@@ -4532,12 +4532,11 @@ def handle_whatsapp_webhook(
 
     if intent == "INTERESTED":
         print(f"WEBHOOK: Candidate is INTERESTED, updating status and sending CTA...")
-        print(f"WEBHOOK: Candidate phone = {job_candidate.candidate.phone}")
         job_candidate.recruitment_status = "INTERESTED"
         db.commit()
 
         sent = _send_whatsapp_cta_message(
-            raw_phone=job_candidate.candidate.phone,
+            raw_phone=phone,
             job_candidate_id=str(job_candidate.id),
         )
         print(f"WEBHOOK: CTA send result = {sent}")
@@ -4567,7 +4566,7 @@ def handle_whatsapp_webhook(
             "in proceeding with the opportunity, or NO if you are not interested."
         )
         sent = _send_whatsapp_text_message(
-            raw_phone=job_candidate.candidate.phone,
+            raw_phone=phone,
             text_message=clarification,
         )
         db.add(
@@ -4583,11 +4582,12 @@ def handle_whatsapp_webhook(
         )
         db.commit()
 
+    candidate = db.get(Candidate, job_candidate.candidate_id)
     return {
         "status": intent,
         "job_candidate_id": str(job_candidate.id),
         "candidate_id": str(job_candidate.candidate_id),
-        "candidate_name": job_candidate.candidate.name,
+        "candidate_name": candidate.name if candidate else "Unknown",
         "message": text_message,
     }
 
@@ -4611,6 +4611,8 @@ def schedule_candidate_interview(
     job_candidate.recruitment_status = "INTERVIEW_SCHEDULED"
     db.commit()
 
+    candidate = db.get(Candidate, job_candidate.candidate_id)
+
     date_text = scheduled_at.strftime("%d %b %Y, %I:%M %p")
     message = (
         "Your interview has been scheduled successfully! 🎉\n\n"
@@ -4621,7 +4623,7 @@ def schedule_candidate_interview(
     message += "\nPlease be available a few minutes before the scheduled time."
 
     sent = _send_whatsapp_text_message(
-        raw_phone=job_candidate.candidate.phone,
+        raw_phone=candidate.phone if candidate else "",
         text_message=message,
     )
 
