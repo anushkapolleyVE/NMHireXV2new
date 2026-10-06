@@ -4172,7 +4172,7 @@ def _send_whatsapp_cta_message(
     frontend_url = getattr(
         settings,
         "FRONTEND_URL",
-        "https://nmhirex.onrender.com",
+        "https://nm-hire-xv-2new.vercel.app",
     ).rstrip("/")
 
     scheduling_link = (
