@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
-import { createJobFromRequisition, fetchTopCandidates, updateCandidateStatus } from '../utils/api';
+import { createJobFromRequisition, fetchTopCandidates, updateCandidateStatus, getJobCandidates } from '../utils/api';
 
 function WhatsappInviteModal({ isOpen, onClose, candidate, onSend }) {
   if (!isOpen || !candidate) return null;
@@ -117,7 +117,26 @@ export default function TopCandidates() {
         const jId = jobData.job_id;
         if (isMounted) setJobId(jId);
 
-        // 2. Fetch top candidates
+        // 2. Check if we already have candidates for this job
+        setStatusText('Checking local database...');
+        try {
+          const localData = await getJobCandidates(jId);
+          let localList = [];
+          if (Array.isArray(localData)) localList = localData;
+          else if (localData && Array.isArray(localData.data)) localList = localData.data;
+
+          if (localList.length > 0) {
+            if (isMounted) {
+              setCandidates(localList);
+              setLoading(false);
+            }
+            return; // Skip external screening since candidates are already here
+          }
+        } catch (e) {
+          console.warn("Failed to fetch local candidates, proceeding with screening", e);
+        }
+
+        // 3. Fetch top candidates
         setStatusText('Sheela is starting to read resumes...');
         
         const loadingMessages = [
