@@ -374,6 +374,11 @@ def api_whatsapp_webhook(
     ),
     db: Session = Depends(get_db),
 ):
+    print("="*50)
+    print("WHATSAPP WEBHOOK RECEIVED!")
+    print(f"PAYLOAD: {payload}")
+    print("="*50)
+
     if settings.WEBHOOK_SECRET:
         if x_webhook_secret != settings.WEBHOOK_SECRET:
             raise HTTPException(

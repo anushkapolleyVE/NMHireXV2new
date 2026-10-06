@@ -4635,6 +4635,9 @@ def handle_whatsapp_webhook(
             except (ValueError, TypeError):
                 job_candidate = None
 
+    print(f"WEBHOOK EXTRACTED PHONE: {phone}")
+    print(f"WEBHOOK EXTRACTED TEXT: {text_message}")
+
     # Fall back to the latest active candidate record for the phone number.
     if job_candidate is None and phone:
         job_candidate = db.execute(
@@ -4650,8 +4653,26 @@ def handle_whatsapp_webhook(
             )
             .order_by(JobCandidate.updated_at.desc())
         ).scalars().first()
+        
+        if not job_candidate and phone.startswith("91"):
+            alt_phone = phone[2:]
+            print(f"WEBHOOK: Try fallback without country code: {alt_phone}")
+            job_candidate = db.execute(
+                select(JobCandidate)
+                .join(Candidate, Candidate.id == JobCandidate.candidate_id)
+                .where(
+                    Candidate.phone == alt_phone,
+                    JobCandidate.recruitment_status.in_([
+                        "CONTACTED",
+                        "INTERESTED",
+                        "INTERVIEW_LINK_SENT",
+                    ]),
+                )
+                .order_by(JobCandidate.updated_at.desc())
+            ).scalars().first()
 
     if not job_candidate:
+        print(f"WEBHOOK: No active JobCandidate found for phone {phone} (ignored)")
         return {
             "status": "IGNORED",
             "reason": "No active JobCandidate found",
