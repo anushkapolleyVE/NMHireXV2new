@@ -35,7 +35,6 @@ from .config import settings
 from .database import get_db
 from .models import Job, JobCandidate, JobSource, User
 from .tools_function import (
-    create_job,
     create_job_from_resume_matching_requisition,
     get_admin_job_candidates,
     get_admin_jobs,
@@ -46,13 +45,12 @@ from .tools_function import (
     get_user_job_candidates,
     get_user_jobs,
     handle_whatsapp_webhook,
-    ingest_resume_folder,
-    read_file,
     schedule_candidate_interview,
     send_top_outreach,
     sync_resume_matching_candidates,
     update_interview_status,
     update_candidate_status,
+    get_all_candidates,
 )
 
 router = APIRouter(prefix="/api")
@@ -184,74 +182,7 @@ def me(user: User = Depends(get_current_user)):
     }
 
 
-# ============================================================
-# RESUME INGESTION - legacy/admin only
-# ============================================================
-@router.post("/resumes/ingest")
-def api_ingest_resumes(
-    admin: User = Depends(require_admin),
-    db: Session = Depends(get_db),
-):
-    return ingest_resume_folder(db)
 
-
-# ============================================================
-# LEGACY JD CREATION - kept for backward compatibility
-# The new VEREQ flow below does not need JD upload.
-# ============================================================
-@router.post("/jobs")
-def api_create_job(
-    file: UploadFile | None = File(None),
-    jd_text: str | None = Form(None),
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    if user.role == "ADMIN":
-        raise HTTPException(
-            status_code=403,
-            detail="Admin cannot create job descriptions",
-        )
-
-    if file and jd_text:
-        raise HTTPException(
-            status_code=400,
-            detail="Provide either a JD file or JD text, not both",
-        )
-
-    if not file and not jd_text:
-        raise HTTPException(
-            status_code=400,
-            detail="Provide either a JD file or JD text",
-        )
-
-    if jd_text:
-        job = create_job(
-            db=db,
-            user_id=user.id,
-            raw_text=jd_text,
-        )
-    else:
-        file_path = Path(settings.JD_DIR) / file.filename
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(file_path, "wb") as output:
-            output.write(file.file.read())
-
-        raw_text = read_file(str(file_path))
-        job = create_job(
-            db=db,
-            user_id=user.id,
-            raw_text=raw_text,
-            file_name=file.filename,
-            file_path=str(file_path),
-        )
-
-    return {
-        "success": True,
-        "job_id": str(job.id),
-        "title": job.title,
-        "status": job.status,
-    }
 
 
 # ============================================================
@@ -381,55 +312,7 @@ def api_resume_matching(
         )
 
 
-# ============================================================
-# BACKWARD-COMPATIBLE SCREEN ENDPOINT
-# IMPORTANT: it no longer runs local AI scoring.
-# ============================================================
-@router.post("/jobs/{job_id}/screen")
-def api_screen_job(
-    job_id: UUID,
-    vereq_number: str | None = Query(None),
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    job = db.get(Job, job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
 
-    if user.role != "ADMIN" and job.created_by != user.id:
-        raise HTTPException(status_code=403, detail="Not your job")
-
-    if not vereq_number:
-        source = db.execute(
-            select(JobSource)
-            .where(
-                JobSource.job_id == job_id,
-                JobSource.source_name == "RESUME_MATCHING",
-            )
-            .order_by(JobSource.searched_at.desc())
-        ).scalars().first()
-
-        if source and source.search_criteria:
-            vereq_number = source.search_criteria.get("vereq_number")
-
-    if not vereq_number:
-        raise HTTPException(
-            status_code=400,
-            detail="VEREQ number is required for external matching",
-        )
-
-    try:
-        return sync_resume_matching_candidates(
-            db=db,
-            job_id=job_id,
-            vereq_number=vereq_number,
-            top_n=100,
-            poll=True,
-            end_user=user.email,
-        )
-    except Exception as exc:
-        db.rollback()
-        raise HTTPException(status_code=502, detail=str(exc))
 
 
 # ============================================================
@@ -650,12 +533,16 @@ def api_user_dashboard(
     return get_user_dashboard(db, user.id)
 
 
-@router.get("/outreach/candidates")
-def api_outreach_candidates(
+@router.get("/user/outreach")
+def api_user_outreach(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return {
-        "success": True,
-        "data": get_outreach_candidates(db, user.id),
-    }
+    return get_outreach_candidates(db, user.id)
+
+@router.get("/user/candidates")
+def api_user_all_candidates(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return get_all_candidates(db, user.id)

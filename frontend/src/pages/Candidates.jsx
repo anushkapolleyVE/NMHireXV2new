@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAllCandidates } from '../utils/api';
 import Header from '../components/Header';
-import SyncCandidatesModal from '../components/SyncCandidatesModal';
+
 import ProfileModal from '../components/ProfileModal';
 
 const formatScheduledTime = (isoStr) => {
@@ -26,7 +26,7 @@ export default function Candidates() {
   const [loading, setLoading] = useState(true);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
-  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+
 
   useEffect(() => {
     const fetchCandidates = async () => {
@@ -78,9 +78,7 @@ export default function Candidates() {
 
       <Header />
       <ProfileModal isOpen={!!selectedCandidate} onClose={() => setSelectedCandidate(null)} candidate={selectedCandidate} />
-      <SyncCandidatesModal isOpen={isSyncModalOpen} onClose={() => setIsSyncModalOpen(false)}
-        onSyncSuccess={() => { setIsSyncModalOpen(false); window.location.reload(); }}
-      />
+
 
       <main className="relative z-10">
         <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
@@ -94,10 +92,7 @@ export default function Candidates() {
               <h1 className="font-display text-4xl font-bold tracking-tight sm:text-5xl text-white">Interested Candidates</h1>
               <p className="text-base text-slate-400">Review candidates who have accepted your outreach invitation.</p>
             </div>
-            <button onClick={() => setIsSyncModalOpen(true)}
-              className="rounded-xl bg-slate-800/80 px-5 py-3.5 text-sm font-bold text-white ring-1 ring-slate-700 hover:bg-slate-700 shadow-sm transition-all hover:-translate-y-0.5 whitespace-nowrap flex-shrink-0">
-              + Import candidates
-            </button>
+
           </div>
 
           <div className="mb-8 flex flex-wrap items-center gap-4 animate-slide-up opacity-0-init animate-delay-200">

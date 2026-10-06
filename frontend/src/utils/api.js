@@ -43,86 +43,7 @@ const getErrorMessage = async (response, fallback) => {
 };
 
 
-// --------------------------------------------------
-// CREATE JOB FROM FILE
-// --------------------------------------------------
 
-export const createJob = async (file) => {
-  const formData = new FormData();
-
-  formData.append("file", file);
-
-  const response = await fetch(`${API_BASE_URL}/jobs`, {
-    method: "POST",
-    headers: getHeaders(),
-    body: formData,
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      await getErrorMessage(
-        response,
-        "Failed to create job from file."
-      )
-    );
-  }
-
-  return response.json();
-};
-
-
-// --------------------------------------------------
-// CREATE JOB FROM PASTED TEXT
-// --------------------------------------------------
-
-export const createJobFromText = async (jdText) => {
-  const formData = new FormData();
-
-  formData.append("jd_text", jdText);
-
-  const response = await fetch(`${API_BASE_URL}/jobs`, {
-    method: "POST",
-    headers: getHeaders(),
-    body: formData,
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      await getErrorMessage(
-        response,
-        "Failed to create job from text."
-      )
-    );
-  }
-
-  return response.json();
-};
-
-
-// --------------------------------------------------
-// SCREEN JOB
-// --------------------------------------------------
-
-export const screenJob = async (jobId) => {
-  const response = await fetch(
-    `${API_BASE_URL}/jobs/${jobId}/screen`,
-    {
-      method: "POST",
-      headers: getHeaders(),
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      await getErrorMessage(
-        response,
-        "Failed to screen candidates."
-      )
-    );
-  }
-
-  return response.json();
-};
 
 
 // --------------------------------------------------
@@ -177,34 +98,7 @@ export const getJobCandidates = async (jobId) => {
   return response.json();
 };
 
-// --------------------------------------------------
-// SYNC CANDIDATES
-// --------------------------------------------------
 
-export const syncCandidates = async (source, pathOrUrl) => {
-  const response = await fetch(`${API_BASE_URL}/resumes/ingest`, {
-    method: "POST",
-    headers: {
-      ...getHeaders(),
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      source: source,
-      path_or_url: pathOrUrl,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      await getErrorMessage(
-        response,
-        "Failed to sync candidates."
-      )
-    );
-  }
-
-  return response.json();
-};
 
 // --------------------------------------------------
 // GET USER DASHBOARD

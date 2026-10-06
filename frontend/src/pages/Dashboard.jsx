@@ -47,13 +47,10 @@ export default function Dashboard() {
               </h1>
               <p className="mt-3 text-base text-slate-400">Here's your hiring pipeline at a glance.</p>
             </div>
-            <Link to="/match-agent" className="btn-neon rounded-xl px-5 py-3.5 text-sm font-bold text-white flex items-center gap-2 group">
-              Create new match
-              <span className="transition-transform group-hover:translate-x-1">→</span>
-            </Link>
+
           </div>
 
-          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 animate-slide-up opacity-0-init animate-delay-200">
+          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2 animate-slide-up opacity-0-init animate-delay-200">
             <div className="glass-dark glass-dark-card rounded-2xl p-6 relative overflow-hidden group">
               <div className="absolute right-0 top-0 p-4 opacity-5 text-brand transition-transform duration-500 group-hover:scale-110 group-hover:rotate-12">
                 <svg className="w-20 h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM10 4h4v2h-4V4zm10 16H4V8h16v12z" /></svg>
@@ -71,25 +68,6 @@ export default function Dashboard() {
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400 relative z-10">Candidates screened</p>
               <p className="mt-2 font-display text-5xl font-bold text-white relative z-10">{dashboardData?.metrics?.candidates_screened || 0}</p>
               <p className="mt-2 text-[11px] font-semibold text-slate-400 relative z-10">Across active jobs</p>
-            </div>
-            <div className="glass-dark glass-dark-card rounded-2xl p-6 relative overflow-hidden group animate-delay-200">
-              <div className="absolute right-0 top-0 p-4 opacity-5 text-accent transition-transform duration-500 group-hover:scale-110 group-hover:rotate-12">
-                <svg className="w-20 h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>
-              </div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 relative z-10">Strong matches</p>
-              <p className="mt-2 font-display text-5xl font-bold text-white relative z-10">{dashboardData?.metrics?.strong_matches || 0}</p>
-              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-accent/20 px-2 py-1 text-[11px] font-bold text-accent ring-1 ring-accent/30 relative z-10 shadow-[0_0_10px_rgba(20,184,166,0.2)]">
-                <svg className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                90+ and 80+ matches
-              </p>
-            </div>
-            <div className="glass-dark glass-dark-card rounded-2xl p-6 relative overflow-hidden group animate-delay-300">
-              <div className="absolute right-0 top-0 p-4 opacity-5 text-purple-400 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-12">
-                <svg className="w-20 h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z" /></svg>
-              </div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 relative z-10">WhatsApp outreach</p>
-              <p className="mt-2 font-display text-5xl font-bold text-white relative z-10">{dashboardData?.metrics?.whatsapp_outreach || 0}</p>
-              <p className="mt-2 text-[11px] font-semibold text-slate-400 relative z-10">0 interested</p>
             </div>
           </section>
 
@@ -159,7 +137,7 @@ export default function Dashboard() {
                         </td>
                         <td className="py-4 pr-2 text-right rounded-r-lg">
                           <button 
-                            onClick={() => navigate('/match-agent', { state: { jobId: job.job_id, autoSearch: true, isScreened: job.screened > 0 || job.status === 'ACTIVE' } })}
+                            onClick={() => navigate('/candidates')}
                             className="rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-white hover:shadow-[0_0_15px_rgba(59,130,246,0.4)] transition-all"
                           >
                             View Screened

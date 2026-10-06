@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
-import MatchAgent from './pages/MatchAgent';
+
 import Candidates from './pages/Candidates';
 import JobDescriptions from './pages/JobDescriptions';
 import Outreach from './pages/Outreach';
@@ -19,7 +19,7 @@ function App() {
 
       <Route path="/admin" element={<AdminDashboard />} />
       <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/match-agent" element={<MatchAgent />} />
+
       <Route path="/candidates" element={<Candidates />} />
       <Route path="/job-descriptions" element={<JobDescriptions />} />
       <Route path="/outreach" element={<Outreach />} />

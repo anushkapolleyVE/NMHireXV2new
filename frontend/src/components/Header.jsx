@@ -29,7 +29,7 @@ export default function Header({ showNav = true }) {
       ]
     : [
         { name: 'Dashboard', path: '/dashboard' },
-        { name: 'Match Agent', path: '/match-agent' },
+
         { name: 'Job Descriptions', path: '/job-descriptions' },
         { name: 'Outreach', path: '/outreach' },
         { name: 'Candidates', path: '/candidates' }
