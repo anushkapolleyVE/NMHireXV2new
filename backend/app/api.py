@@ -551,3 +551,45 @@ def api_user_all_candidates(
     db: Session = Depends(get_db),
 ):
     return get_all_candidates(db, user.id)
+
+class ScheduleConfirmRequest(BaseModel):
+    job_candidate_id: UUID
+    interview_date: str
+    interview_time: str
+    timezone: str
+
+@router.get("/scheduling/dates")
+def api_scheduling_dates():
+    import datetime
+    today = datetime.date.today()
+    dates = []
+    for i in range(1, 8):
+        d = today + datetime.timedelta(days=i)
+        dates.append({"date": d.isoformat()})
+    return {"dates": dates}
+
+@router.get("/scheduling/slots")
+def api_scheduling_slots(date: str):
+    return {"slots": ["10:00 AM", "11:30 AM", "02:00 PM", "04:00 PM"]}
+
+@router.post("/scheduling/confirm")
+def api_scheduling_confirm(
+    req: ScheduleConfirmRequest,
+    db: Session = Depends(get_db)
+):
+    import datetime
+    from .tools_function import schedule_candidate_interview
+    
+    dt = datetime.datetime.strptime(f"{req.interview_date} {req.interview_time}", "%Y-%m-%d %I:%M %p")
+    
+    teams_link = f"https://teams.microsoft.com/l/meetup-join/nmhirex-{req.job_candidate_id}"
+    
+    res = schedule_candidate_interview(
+        db=db,
+        job_candidate_id=req.job_candidate_id,
+        scheduled_at=dt,
+        interview_link=teams_link
+    )
+    
+    return {"success": True, "data": {"link": teams_link}}
+
