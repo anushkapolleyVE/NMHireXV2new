@@ -233,16 +233,16 @@ export default function TopCandidates() {
             </div>
           </div>
 
-          <div className="glass-dark rounded-[24px] overflow-hidden animate-slide-up opacity-0-init animate-delay-300">
-            <div className="overflow-x-auto pb-2">
+          <div className="glass-dark rounded-[24px] overflow-hidden animate-slide-up opacity-0-init animate-delay-300 border border-slate-800/50">
+            <div className="overflow-auto max-h-[600px] custom-scrollbar pb-2 pr-1 relative">
               <table className="w-full min-w-[960px] text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-700 bg-slate-900/50 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                    <th className="py-4 pl-6">Candidate</th>
-                    <th className="py-4">Email / Phone</th>
-                    <th className="py-4">Classification</th>
-                    <th className="py-4">Score</th>
-                    <th className="py-4 pr-6 text-right">Resume</th>
+                <thead className="sticky top-0 bg-[#0B1121] z-10 before:absolute before:inset-0 before:bg-slate-900/50 before:-z-10 before:backdrop-blur-md">
+                  <tr className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <th className="py-4 pl-6 border-b border-slate-700">Candidate</th>
+                    <th className="py-4 border-b border-slate-700">Email / Phone</th>
+                    <th className="py-4 border-b border-slate-700">Classification</th>
+                    <th className="py-4 border-b border-slate-700">Score</th>
+                    <th className="py-4 pr-6 text-right border-b border-slate-700">Resume</th>
                   </tr>
                 </thead>
                 <tbody className="text-sm">
@@ -306,14 +306,14 @@ export default function TopCandidates() {
                                 setSelectedWhatsappCandidate(c);
                                 setWhatsappModalOpen(true);
                               }}
-                              disabled={whatsappContacted[c.candidate_id || c.id]}
+                              disabled={whatsappContacted[c.candidate_id || c.id] || c.status === 'CONTACTED'}
                               className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors ${
-                                whatsappContacted[c.candidate_id || c.id]
+                                (whatsappContacted[c.candidate_id || c.id] || c.status === 'CONTACTED')
                                   ? 'bg-green-500/20 text-green-500 border border-green-500/30'
                                   : 'bg-green-600 text-white hover:bg-green-500 shadow-sm'
                               }`}
                             >
-                              {whatsappContacted[c.candidate_id || c.id] ? "✓ Invited" : "WhatsApp"}
+                              {(whatsappContacted[c.candidate_id || c.id] || c.status === 'CONTACTED') ? "✓ Invited" : "WhatsApp"}
                             </button>
                           </div>
                         </td>

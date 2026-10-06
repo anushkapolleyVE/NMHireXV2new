@@ -3539,7 +3539,7 @@ def get_user_job_candidates(db: Session, user_id: UUID, job_id: UUID) -> list[di
     """Input: authenticated user and job UUID. Output: Top 10 only when the user owns the JD."""
     if not db.scalar(select(Job.id).where(Job.id == job_id, Job.created_by == user_id)):
         raise PermissionError("Job does not belong to current user")
-    return get_job_candidates(db, job_id)
+    return get_job_candidates(db, job_id, limit=50)
 
 def get_admin_jobs(db: Session) -> list[dict]:
     """Input: DB session. Output: all JDs with uploader and Top 10 summary."""
