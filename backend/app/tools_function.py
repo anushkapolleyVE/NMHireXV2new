@@ -4705,10 +4705,13 @@ def handle_whatsapp_webhook(
     db.commit()
 
     intent = _classify_whatsapp_response(text_message)
+    print(f"WEBHOOK: Intent detected = {intent} for message = '{text_message}'")
     inbound.response_intent = intent
     db.commit()
 
     if intent == "INTERESTED":
+        print(f"WEBHOOK: Candidate is INTERESTED, updating status and sending CTA...")
+        print(f"WEBHOOK: Candidate phone = {job_candidate.candidate.phone}")
         job_candidate.recruitment_status = "INTERESTED"
         db.commit()
 
@@ -4716,6 +4719,7 @@ def handle_whatsapp_webhook(
             raw_phone=job_candidate.candidate.phone,
             job_candidate_id=str(job_candidate.id),
         )
+        print(f"WEBHOOK: CTA send result = {sent}")
 
         if sent:
             job_candidate.recruitment_status = "INTERVIEW_LINK_SENT"
