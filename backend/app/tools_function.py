@@ -3698,27 +3698,90 @@ def _extract_provider_message_id(response_body: str | dict | None) -> str | None
     return None
 
 
-def _send_whatsapp_payload(payload):
-    # existing code...
+def _send_whatsapp_payload(
+    payload: dict,
+) -> tuple[bool, dict | None, str | None]:
+    """
+    Send a WhatsApp payload to NMVE.
 
-    if (
-        getattr(settings, "WHATSAPP_TEST_MODE", False)
-        and getattr(settings, "WHATSAPP_TEST_NUMBER", "")
+    In test mode, the destination is ALWAYS
+    WHATSAPP_TEST_NUMBER.
+
+    If test mode is enabled but the test number is missing,
+    the message is blocked to prevent accidental delivery
+    to a real candidate.
+    """
+
+    url = getattr(
+        settings,
+        "WHATSAPP_BASE_URL",
+        "https://nmve.io/whatsapp/api/integrations/whatsapp/messages",
+    )
+
+    api_key = getattr(
+        settings,
+        "WHATSAPP_API_KEY",
+        "",
+    )
+
+    if not api_key:
+        print(
+            "WHATSAPP_API_KEY is not configured."
+        )
+        return False, None, None
+
+    # --------------------------------------------------
+    # WHATSAPP TEST MODE SAFETY OVERRIDE
+    # --------------------------------------------------
+
+    if getattr(
+        settings,
+        "WHATSAPP_TEST_MODE",
+        False,
     ):
+
+        test_number = getattr(
+            settings,
+            "WHATSAPP_TEST_NUMBER",
+            "",
+        )
+
+        if not test_number:
+            print(
+                "WHATSAPP TEST MODE is enabled but "
+                "WHATSAPP_TEST_NUMBER is missing. "
+                "BLOCKING WhatsApp send."
+            )
+            return False, None, None
+
+        test_phone = _clean_whatsapp_phone(
+            test_number
+        )
+
+        if not test_phone:
+            print(
+                "WHATSAPP_TEST_NUMBER is invalid. "
+                "BLOCKING WhatsApp send."
+            )
+            return False, None, None
+
         original_to = payload.get("to")
 
-        payload["to"] = _clean_whatsapp_phone(
-            settings.WHATSAPP_TEST_NUMBER
-        )
+        payload["to"] = test_phone
 
         print(
             f"WHATSAPP TEST MODE: "
-            f"{original_to} -> {payload['to']}"
+            f"{original_to} -> {test_phone}"
         )
 
-    data = json.dumps(payload).encode("utf-8")
+    # --------------------------------------------------
+    # SEND PAYLOAD
+    # --------------------------------------------------
 
-    # existing code...
+    data = json.dumps(payload).encode(
+        "utf-8"
+    )
+
     request = urllib.request.Request(
         url,
         data=data,
@@ -3727,43 +3790,75 @@ def _send_whatsapp_payload(payload):
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            body = response.read().decode("utf-8", errors="replace")
+        with urllib.request.urlopen(
+            request,
+            timeout=30,
+        ) as response:
+
+            body = response.read().decode(
+                "utf-8",
+                errors="replace",
+            )
+
             print(
-                f"WhatsApp API response status: {response.status}"
+                f"WhatsApp API response status: "
+                f"{response.status}"
             )
 
             parsed = None
+
             if body.strip():
                 try:
                     parsed = json.loads(body)
+
                 except json.JSONDecodeError:
-                    parsed = {"raw_response": body}
+                    parsed = {
+                        "raw_response": body
+                    }
 
             return (
                 True,
                 parsed,
-                _extract_provider_message_id(parsed),
+                _extract_provider_message_id(
+                    parsed
+                ),
             )
 
     except urllib.error.HTTPError as http_err:
+
         try:
-            error_body = http_err.read().decode("utf-8", errors="replace")
+            error_body = (
+                http_err.read()
+                .decode(
+                    "utf-8",
+                    errors="replace",
+                )
+            )
+
         except Exception:
-            error_body = str(http_err)
+            error_body = str(
+                http_err
+            )
 
         print(
-            f"WhatsApp API HTTP Error: {http_err.code}"
+            f"WhatsApp API HTTP Error: "
+            f"{http_err.code}"
         )
+
         print(
-            f"Error Details: {error_body}"
+            f"Error Details: "
+            f"{error_body}"
         )
+
         return False, None, None
 
     except Exception as error:
+
         print(
-            f"WhatsApp API Error: {error}"
+            f"WhatsApp API Error: "
+            f"{error}"
         )
+
         return False, None, None
 
 
@@ -3776,12 +3871,17 @@ def _send_whatsapp_to_candidate(
     """
     Send the initial NMVE WhatsApp template to one candidate.
 
-    Phone priority remains:
+    TEST MODE:
+        WHATSAPP_TEST_NUMBER is ALWAYS used.
+
+    NORMAL MODE:
         target_phone -> WHATSAPP_STAGE_NUMBER -> candidate.phone
 
-    The function records the successful outbound message in candidate_contacts
-    and moves a NEW candidate to CONTACTED. No candidate score is calculated here.
+    The function records the successful outbound message in
+    candidate_contacts and moves a NEW candidate to CONTACTED.
+    No candidate score is calculated here.
     """
+
     print(
         f"--- Attempting WhatsApp Integration for candidate "
         f"{candidate_id} ---"
@@ -3793,7 +3893,9 @@ def _send_whatsapp_to_candidate(
         ).first()
 
         if not candidate:
-            print("Candidate not found in DB.")
+            print(
+                "Candidate not found in DB."
+            )
             return False
 
         job_candidate = db.scalar(
@@ -3804,40 +3906,96 @@ def _send_whatsapp_to_candidate(
         )
 
         if not job_candidate:
-            print("JobCandidate not found.")
+            print(
+                "JobCandidate not found."
+            )
             return False
 
         # --------------------------------------------------
         # PHONE NUMBER
         # --------------------------------------------------
-        raw_phone = target_phone
 
-        if not raw_phone:
-            raw_phone = getattr(
+        if getattr(
+            settings,
+            "WHATSAPP_TEST_MODE",
+            False,
+        ):
+
+            # --------------------------------------------------
+            # TEST MODE
+            # NEVER USE CANDIDATE PHONE
+            # --------------------------------------------------
+
+            test_number = getattr(
                 settings,
-                "WHATSAPP_STAGE_NUMBER",
-                None,
+                "WHATSAPP_TEST_NUMBER",
+                "",
             )
 
-        if not raw_phone:
-            raw_phone = (
-                str(candidate.phone)
-                if candidate.phone
-                else ""
+            if not test_number:
+                print(
+                    "WHATSAPP TEST MODE is enabled but "
+                    "WHATSAPP_TEST_NUMBER is not configured. "
+                    "Blocking WhatsApp send."
+                )
+                return False
+
+            clean_phone = _clean_whatsapp_phone(
+                test_number
             )
 
-        clean_phone = _clean_whatsapp_phone(raw_phone)
+            if not clean_phone:
+                print(
+                    "WHATSAPP_TEST_NUMBER is invalid. "
+                    "Blocking WhatsApp send."
+                )
+                return False
 
-        if not clean_phone:
             print(
-                "No valid phone number available for candidate. "
-                "Skipping WhatsApp."
+                f"WHATSAPP TEST MODE ENABLED - "
+                f"Sending ONLY to test number: "
+                f"{clean_phone}"
             )
-            return False
+
+        else:
+
+            # --------------------------------------------------
+            # NORMAL PRODUCTION MODE
+            # EXISTING PHONE PRIORITY
+            # --------------------------------------------------
+
+            raw_phone = target_phone
+
+            if not raw_phone:
+                raw_phone = getattr(
+                    settings,
+                    "WHATSAPP_STAGE_NUMBER",
+                    None,
+                )
+
+            if not raw_phone:
+                raw_phone = (
+                    str(candidate.phone)
+                    if candidate.phone
+                    else ""
+                )
+
+            clean_phone = _clean_whatsapp_phone(
+                raw_phone
+            )
+
+            if not clean_phone:
+                print(
+                    "No valid phone number available "
+                    "for candidate. "
+                    "Skipping WhatsApp."
+                )
+                return False
 
         # --------------------------------------------------
         # CONFIGURATION
         # --------------------------------------------------
+
         callback_url = getattr(
             settings,
             "WHATSAPP_CALLBACK_URL",
@@ -3860,6 +4018,10 @@ def _send_whatsapp_to_candidate(
             f"NMHireX-{str(job_candidate.id)}"
         )
 
+        # --------------------------------------------------
+        # WHATSAPP PAYLOAD
+        # --------------------------------------------------
+
         payload = {
             "to": clean_phone,
             "type": "template",
@@ -3874,10 +4036,14 @@ def _send_whatsapp_to_candidate(
         }
 
         print(
-            f"Sending WhatsApp payload to {clean_phone}..."
+            f"Sending WhatsApp payload to "
+            f"{clean_phone}..."
         )
+
         success, response_body, provider_message_id = (
-            _send_whatsapp_payload(payload)
+            _send_whatsapp_payload(
+                payload
+            )
         )
 
         if not success:
@@ -3886,6 +4052,7 @@ def _send_whatsapp_to_candidate(
         # --------------------------------------------------
         # SAVE OUTBOUND MESSAGE
         # --------------------------------------------------
+
         contact = CandidateContact(
             job_candidate_id=job_candidate.id,
             channel="WHATSAPP",
@@ -3899,27 +4066,190 @@ def _send_whatsapp_to_candidate(
 
         db.add(contact)
 
+        # --------------------------------------------------
+        # UPDATE RECRUITMENT STATUS
+        # --------------------------------------------------
+
         if job_candidate.recruitment_status in {
             None,
             "NEW",
             "SHORTLISTED",
         }:
-            job_candidate.recruitment_status = "CONTACTED"
+            job_candidate.recruitment_status = (
+                "CONTACTED"
+            )
 
         db.commit()
 
         print(
-            "WhatsApp message saved to candidate_contacts."
+            "WhatsApp message saved to "
+            "candidate_contacts."
         )
 
         return True
 
     except Exception as error:
+
         db.rollback()
+
         print(
-            f"Error in WhatsApp integration: {error}"
+            f"Error in WhatsApp integration: "
+            f"{error}"
+        )
+
+        return False
+
+
+def _send_whatsapp_text_message(
+    raw_phone: str,
+    text_message: str,
+):
+    """
+    Send a plain-text WhatsApp message through NMVE.
+    """
+
+    try:
+
+        clean_phone = _clean_whatsapp_phone(
+            raw_phone
+        )
+
+        if not clean_phone:
+            print(
+                "No valid phone number supplied."
+            )
+            return False
+
+        payload = {
+            "to": clean_phone,
+            "type": "text",
+            "text": {
+                "body": text_message,
+            },
+        }
+
+        success, _, _ = _send_whatsapp_payload(
+            payload
+        )
+
+        if success:
+            print(
+                f"WhatsApp text message sent to "
+                f"{clean_phone}."
+            )
+
+        return success
+
+    except Exception as error:
+
+        print(
+            f"Error sending WhatsApp text: "
+            f"{error}"
+        )
+
+        return False
+
+
+def _send_whatsapp_cta_message(
+    raw_phone: str,
+    job_candidate_id: str,
+):
+    """
+    Send the interview scheduling CTA,
+    with text fallback.
+    """
+
+    clean_phone = _clean_whatsapp_phone(
+        raw_phone
+    )
+
+    if not clean_phone:
+        print(
+            "No valid phone number supplied."
         )
         return False
+
+    frontend_url = getattr(
+        settings,
+        "FRONTEND_URL",
+        "http://localhost:5173",
+    ).rstrip("/")
+
+    scheduling_link = (
+        f"{frontend_url}/schedule/"
+        f"{job_candidate_id}"
+    )
+
+    payload = {
+        "to": clean_phone,
+        "type": "interactive",
+        "interactive": {
+            "type": "cta_url",
+            "header": {
+                "type": "text",
+                "text": "Great news! 🎉",
+            },
+            "body": {
+                "text": (
+                    "Please schedule your interview at a convenient "
+                    "date and time within the next 7 days.\n\n"
+                    "Tap the button below to select your preferred "
+                    "date and time.\n\n"
+                    "We look forward to connecting with you! 😊"
+                ),
+            },
+            "action": {
+                "name": "cta_url",
+                "parameters": {
+                    "display_text": "Schedule Now",
+                    "url": scheduling_link,
+                },
+            },
+        },
+    }
+
+    try:
+
+        success, _, _ = _send_whatsapp_payload(
+            payload
+        )
+
+        if success:
+            print(
+                f"WhatsApp CTA message sent to "
+                f"{clean_phone}."
+            )
+            return True
+
+    except Exception as error:
+
+        print(
+            f"Error sending WhatsApp CTA: "
+            f"{error}"
+        )
+
+    # --------------------------------------------------
+    # FALLBACK: PLAIN TEXT SCHEDULING LINK
+    # --------------------------------------------------
+
+    print(
+        "Falling back to plain text message "
+        "with URL..."
+    )
+
+    fallback_message = (
+        "Great news! 🎉\n\n"
+        "Please schedule your interview at a convenient "
+        "date and time within the next 7 days.\n\n"
+        f"Schedule your interview here:\n"
+        f"{scheduling_link}\n\n"
+        "We look forward to connecting with you! 😊"
+    )
+
+    return _send_whatsapp_text_message(
+        clean_phone,
+        fallback_message,
+    )
 
 
 def _send_whatsapp_text_message(
