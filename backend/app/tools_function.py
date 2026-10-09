@@ -4606,20 +4606,32 @@ def schedule_candidate_interview(
     if job_candidate.recruitment_status == "NOT_INTERESTED":
         raise ValueError("Candidate is not interested")
 
+    import uuid
+    from .config import settings
+    
+    if not job_candidate.reschedule_token:
+        job_candidate.reschedule_token = str(uuid.uuid4())
+        
     job_candidate.interview_scheduled_at = scheduled_at
     job_candidate.interview_link = interview_link
     job_candidate.recruitment_status = "INTERVIEW_SCHEDULED"
+    job_candidate.reminder_24h_sent = False
+    job_candidate.reminder_1h_sent = False
     db.commit()
 
     candidate = db.get(Candidate, job_candidate.candidate_id)
 
     date_text = scheduled_at.strftime("%d %b %Y, %I:%M %p")
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+    reschedule_link = f"{frontend_url}/reschedule/{job_candidate.reschedule_token}"
+    
     message = (
         "Your interview has been scheduled successfully! 🎉\n\n"
         f"Date & Time: {date_text}\n"
     )
     if interview_link:
         message += f"\nInterview Link:\n{interview_link}\n"
+    message += f"\nNeed to pick a new time? Reschedule here:\n{reschedule_link}\n"
     message += "\nPlease be available a few minutes before the scheduled time."
 
     sent = _send_whatsapp_text_message(

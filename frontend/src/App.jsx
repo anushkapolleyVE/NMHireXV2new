@@ -9,6 +9,7 @@ import Outreach from './pages/Outreach';
 import Register from './pages/Register';
 import ScheduleInterview from './pages/ScheduleInterview';
 import TopCandidates from './pages/TopCandidates';
+import Reschedule from './pages/Reschedule';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
       <Route path="/job-descriptions" element={<JobDescriptions />} />
       <Route path="/outreach" element={<Outreach />} />
       <Route path="/schedule/:candidateId" element={<ScheduleInterview />} />
+      <Route path="/reschedule/:token" element={<Reschedule />} />
       <Route path="/requisitions/:vereq/matches" element={<TopCandidates />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -75,6 +75,10 @@ class CandidateStatusRequest(BaseModel):
 class RequisitionJobRequest(BaseModel):
     vereq_number: str = Field(min_length=1)
 
+class RescheduleRequest(BaseModel):
+    new_date: str
+    new_time: str
+    timezone: str = "UTC"
 
 # ============================================================
 # HEALTH
@@ -592,4 +596,52 @@ def api_scheduling_confirm(
     )
     
     return {"success": True, "data": {"link": teams_link}}
+
+@router.get("/reschedule/{token}")
+def api_get_reschedule_details(token: str, db: Session = Depends(get_db)):
+    from .models import JobCandidate, Candidate, Job
+    jc = db.query(JobCandidate).filter(JobCandidate.reschedule_token == token).first()
+    if not jc:
+        raise HTTPException(status_code=404, detail="Invalid or expired token")
+        
+    candidate = db.get(Candidate, jc.candidate_id)
+    job = db.get(Job, jc.job_id)
+    
+    return {
+        "success": True,
+        "data": {
+            "candidate_name": candidate.name,
+            "job_title": job.title,
+            "current_scheduled_at": jc.interview_scheduled_at
+        }
+    }
+
+@router.post("/reschedule/{token}")
+def api_post_reschedule(token: str, req: RescheduleRequest, db: Session = Depends(get_db)):
+    from .models import JobCandidate
+    from .tools_function import send_whatsapp_message
+    import datetime
+    
+    jc = db.query(JobCandidate).filter(JobCandidate.reschedule_token == token).first()
+    if not jc:
+        raise HTTPException(status_code=404, detail="Invalid or expired token")
+        
+    dt = datetime.datetime.strptime(f"{req.new_date} {req.new_time}", "%Y-%m-%d %I:%M %p")
+    
+    jc.interview_scheduled_at = dt
+    jc.reminder_24h_sent = False
+    jc.reminder_1h_sent = False
+    
+    # Optionally re-generate teams link if needed
+    
+    db.commit()
+    
+    from .models import Candidate
+    candidate = db.get(Candidate, jc.candidate_id)
+    if candidate.phone:
+        msg = f"Hi {candidate.name}, your interview has been successfully rescheduled to {dt.strftime('%B %d, %Y at %I:%M %p')}."
+        # Fire and forget / background task is preferred, but calling directly here for simplicity
+        send_whatsapp_message(candidate.phone, msg)
+        
+    return {"success": True, "message": "Interview rescheduled successfully"}
 

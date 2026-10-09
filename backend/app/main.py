@@ -13,7 +13,22 @@ async def lifespan(app: FastAPI):
     # Create missing tables for a fresh development database.
     # Existing tables/columns are NOT altered by create_all().
     Base.metadata.create_all(bind=engine)
+    
+    import asyncio
+    from .scheduler import check_interview_reminders
+    
+    async def run_scheduler():
+        while True:
+            try:
+                # Run sync function in thread pool
+                await asyncio.to_thread(check_interview_reminders)
+            except Exception as e:
+                print(f"Scheduler error: {e}")
+            await asyncio.sleep(300) # Every 5 minutes
+            
+    task = asyncio.create_task(run_scheduler())
     yield
+    task.cancel()
 
 
 app = FastAPI(

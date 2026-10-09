@@ -415,6 +415,9 @@ class JobCandidate(Base):
         DateTime(timezone=True)
     )
     interview_link: Mapped[str | None] = mapped_column(Text)
+    reschedule_token: Mapped[str | None] = mapped_column(String(36), unique=True, index=True)
+    reminder_24h_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    reminder_1h_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )
