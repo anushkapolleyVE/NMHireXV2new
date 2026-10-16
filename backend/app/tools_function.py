@@ -4338,6 +4338,7 @@ def send_top_outreach(
         "job_id": str(job_id),
         "requested_limit": limit,
         "selected": len(candidates),
+        
         "sent": sum(
             1 for item in results
             if item["status"] == "SENT"
@@ -4833,6 +4834,51 @@ def update_candidate_status(
         "old_status": old_status,
         "status": job_candidate.recruitment_status,
     }
+
+
+def bulk_update_candidate_status(
+    db: Session,
+    job_id: UUID,
+    candidate_ids: list[UUID],
+    status: str = "CONTACTED",
+    target_phone: str | None = None,
+) -> dict:
+    """Update recruitment status for multiple candidates and trigger WhatsApp invites."""
+    results = []
+    sent_count = 0
+    failed_count = 0
+
+    for c_id in candidate_ids:
+        try:
+            res = update_candidate_status(
+                db=db,
+                job_id=job_id,
+                candidate_id=c_id,
+                status=status,
+                target_phone=target_phone,
+            )
+            results.append({
+                "candidate_id": str(c_id),
+                "status": "SUCCESS",
+                "detail": res,
+            })
+            sent_count += 1
+        except Exception as exc:
+            results.append({
+                "candidate_id": str(c_id),
+                "status": "FAILED",
+                "error": str(exc),
+            })
+            failed_count += 1
+
+    return {
+        "job_id": str(job_id),
+        "total": len(candidate_ids),
+        "sent": sent_count,
+        "failed": failed_count,
+        "results": results,
+    }
+
 
 def get_all_candidates(db: Session, user_id: UUID) -> list[dict]:
     """Return unique candidates currently in the recruitment workflow."""

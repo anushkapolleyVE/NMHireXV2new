@@ -163,6 +163,20 @@ export const updateCandidateStatus = async (jobId, candidateId, status, targetPh
   return await res.json();
 };
 
+export const bulkUpdateCandidateStatus = async (jobId, candidateIds, status = 'CONTACTED', targetPhone = null) => {
+  const res = await fetch(`${API_BASE_URL}/user/jobs/${jobId}/candidates/bulk-status`, {
+    method: 'POST',
+    headers: {
+      ...getHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ candidate_ids: candidateIds, status, target_phone: targetPhone })
+  });
+  if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to update candidates in bulk'));
+  return await res.json();
+};
+
+
 // --------------------------------------------------
 // EXTERNAL RESUME MATCHING API
 // --------------------------------------------------
