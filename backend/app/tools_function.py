@@ -782,7 +782,7 @@ def _create_candidate_from_external_match(
         "experience",
     )
     notice_period = _candidate_value(
-        item,
+        item, 
         "notice_period_days",
         "notice_period",
         "noticePeriodDays",
@@ -1023,7 +1023,7 @@ def sync_resume_matching_candidates(
     job_source.searched_at = datetime.utcnow()
 
     saved = []
-    shortlist_limit = int(getattr(settings, "OUTREACH_TOP_N", 50) or 50)
+    shortlist_limit = int(getattr(settings, "OUTREACH_TOP_N", 30) or 30)
 
     for index, item in enumerate(matches[:top_n], start=1):
         try:
@@ -4234,7 +4234,7 @@ def _candidate_has_interview_history(
 def get_top_outreach_candidates(
     db: Session,
     job_id: UUID,
-    limit: int = 50,
+    limit: int = 30,
 ) -> list[dict]:
     """
     Select the externally ranked top candidates for WhatsApp outreach.
@@ -4297,7 +4297,7 @@ def get_top_outreach_candidates(
 def send_top_outreach(
     db: Session,
     job_id: UUID,
-    limit: int = 50,
+    limit: int = 30,
 ) -> dict:
     """Send WhatsApp only to the top externally ranked candidates with no history."""
     candidates = get_top_outreach_candidates(
