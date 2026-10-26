@@ -44,15 +44,10 @@ export default function TopCandidates() {
 
     setAutoSending(true);
 
-    const devStage = import.meta.env.VITE_HIRE_X_DEV_STAGE || 'production';
-    const stageNumber = import.meta.env.VITE_WHATSAPP_STAGE_NUMBER || '';
-    const isStageMode = devStage !== 'production';
-
     // 1. Try dedicated bulk backend endpoint first
     try {
       const cIds = eligible.map(c => c.candidate_id || c.id);
-      const targetPhone = isStageMode ? stageNumber : null;
-      const res = await bulkUpdateCandidateStatus(jId, cIds, 'CONTACTED', targetPhone);
+      const res = await bulkUpdateCandidateStatus(jId, cIds, 'CONTACTED');
       
       if (res && res.data) {
         const successIds = (res.data.results || [])
@@ -81,10 +76,9 @@ export default function TopCandidates() {
     for (let i = 0; i < eligible.length; i++) {
       const c = eligible[i];
       const cId = c.candidate_id || c.id;
-      const targetPhone = isStageMode ? stageNumber : c.phone;
 
       try {
-        await updateCandidateStatus(jId, cId, 'CONTACTED', targetPhone);
+        await updateCandidateStatus(jId, cId, 'CONTACTED');
         setWhatsappContacted(prev => ({ ...prev, [cId]: true }));
         sentCount++;
       } catch (err) {
