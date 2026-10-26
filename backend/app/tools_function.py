@@ -3995,9 +3995,10 @@ def _send_whatsapp_to_candidate(
 
             if not raw_phone:
                 if WHATSAPP_STAGE_NUMBERS:
-                    raw_phone = random.choice(
-                        WHATSAPP_STAGE_NUMBERS
+                    random_index = random.randint(
+                        0, len(WHATSAPP_STAGE_NUMBERS) - 1
                     )
+                    raw_phone = WHATSAPP_STAGE_NUMBERS[random_index]
                 else:
                     raw_phone = (
                         str(candidate.phone)
