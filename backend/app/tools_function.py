@@ -55,6 +55,17 @@ luna_client = openai_client
 OCR_MODEL = "gpt-4o"
 
 
+
+import random
+
+WHATSAPP_STAGE_NUMBERS = [
+    "919883236730",
+    "919064148052",
+    "917439717970",
+    "919330609485",
+]
+
+
 # ------------------------------------------------------------
 # EXTERNAL RESUME MATCHING API
 # ------------------------------------------------------------
@@ -1023,7 +1034,7 @@ def sync_resume_matching_candidates(
     job_source.searched_at = datetime.utcnow()
 
     saved = []
-    shortlist_limit = int(getattr(settings, "OUTREACH_TOP_N", 30) or 30)
+    shortlist_limit = int(getattr(settings, "OUTREACH_TOP_N", 50) or 50)
 
     for index, item in enumerate(matches[:top_n], start=1):
         try:
@@ -3964,21 +3975,36 @@ def _send_whatsapp_to_candidate(
             # EXISTING PHONE PRIORITY
             # --------------------------------------------------
 
+            # raw_phone = target_phone
+
+            # if not raw_phone:
+            #     raw_phone = getattr(
+            #         settings,
+            #         "WHATSAPP_STAGE_NUMBER",
+            #         None,
+            #     )
+
+            # if not raw_phone:
+            #     raw_phone = (
+            #         str(candidate.phone)
+            #         if candidate.phone
+            #         else ""
+            #     )
+
             raw_phone = target_phone
 
             if not raw_phone:
-                raw_phone = getattr(
-                    settings,
-                    "WHATSAPP_STAGE_NUMBER",
-                    None,
-                )
+                if WHATSAPP_STAGE_NUMBERS:
+                    raw_phone = random.choice(
+                        WHATSAPP_STAGE_NUMBERS
+                    )
+                else:
+                    raw_phone = (
+                        str(candidate.phone)
+                        if candidate.phone
+                        else ""
+                    )
 
-            if not raw_phone:
-                raw_phone = (
-                    str(candidate.phone)
-                    if candidate.phone
-                    else ""
-                )
 
             clean_phone = _clean_whatsapp_phone(
                 raw_phone
@@ -4234,7 +4260,7 @@ def _candidate_has_interview_history(
 def get_top_outreach_candidates(
     db: Session,
     job_id: UUID,
-    limit: int = 30,
+    limit: int = 50,
 ) -> list[dict]:
     """
     Select the externally ranked top candidates for WhatsApp outreach.
@@ -4297,7 +4323,7 @@ def get_top_outreach_candidates(
 def send_top_outreach(
     db: Session,
     job_id: UUID,
-    limit: int = 30,
+    limit: int = 50,
 ) -> dict:
     """Send WhatsApp only to the top externally ranked candidates with no history."""
     candidates = get_top_outreach_candidates(

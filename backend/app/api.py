@@ -355,7 +355,7 @@ def api_job_candidates(
 @router.post("/jobs/{job_id}/outreach")
 def api_outreach(
     job_id: UUID,
-    limit: int = Query(30, ge=1, le=30),
+    limit: int = Query(50, ge=1, le=50),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
